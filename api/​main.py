@@ -1,6 +1,5 @@
 from http.server import BaseHTTPRequestHandler
 import requests
-import json
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -12,11 +11,11 @@ class handler(BaseHTTPRequestHandler):
         }
         
         try:
-            # Fetch token payload from provider
+            # Fetch token payload from the provider
             response = requests.get(token_url, headers=headers, timeout=10)
             response.raise_for_status()
             
-            # Parse the provider response
+            # Parse the provider response safely
             try:
                 data = response.json()
                 final_url = data.get("url") or data.get("rawUrl")
@@ -31,25 +30,24 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     final_url = token_string.strip()
 
-            # Safeguard injection check
             if not final_url or "hdnts=" not in final_url:
                 raise ValueError("Valid auth token string missing from provider response.")
 
-            # Construct output payload
+            # Construct the dynamic M3U8 payload
             m3u8_content = f"#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=5000000\n{final_url}\n"
             
-            # Send standard 200 HTTP Success headers
+            # Send HTTP Headers
             self.send_response(200)
             self.send_header('Content-Type', 'application/x-mpegURL')
             self.send_header('Content-Disposition', 'inline; filename="master.m3u8"')
             self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Access-Control-Allow-Origin', '*')  # Allows IPTV players to bypass CORS
             self.end_headers()
             
-            # Write M3U8 payload directly to body stream
+            # Output payload
             self.wfile.write(m3u8_content.encode('utf-8'))
 
         except Exception as e:
-            # Fallback error response structured cleanly for serverless environments
             self.send_response(500)
             self.send_header('Content-Type', 'text/plain')
             self.end_headers()
